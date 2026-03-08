@@ -19,38 +19,42 @@ class MarketData:
     vix_52w_high: float
     vix_52w_low: float
     vix_rank: float
-    history: dict  # Do sparklines (ostatnie 5 dni)
+    history: dict  
 
 class VommaEngine:
     @staticmethod
     def fetch_all_data() -> MarketData:
         tickers = ["^VIX", "^VIX9D", "^VIX3M", "^VIX6M", "^VVIX", "^SKEW", "^GSPC"]
         
-        # Pobieramy historię 1 rok dla VIX (do VIX Rank) i SPX (do RV)
+        # Pobieramy historię 1 rok
         data_1y = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
         
-        # Ostatnie dostępne wartości
-        current = data_1y.iloc[-1].fillna(method='ffill')
+        # POPRAWKA: Zmiana fillna() na ffill() ze względu na nowe wersje biblioteki Pandas
+        data_1y = data_1y.ffill()
+        current = data_1y.iloc[-1]
         
-        # Historia 5-dniowa do Sparklines
         hist_5d = data_1y.tail(5).to_dict('series')
         
-        # VIX Rank (52 tygodnie)
-        vix_high = data_1y['^VIX'].max()
-        vix_low = data_1y['^VIX'].min()
-        vix_rank = ((current['^VIX'] - vix_low) / (vix_high - vix_low)) * 100
+        vix_high = float(data_1y['^VIX'].max())
+        vix_low = float(data_1y['^VIX'].min())
+        
+        # Zabezpieczenie przed dzieleniem przez zero
+        if vix_high - vix_low == 0:
+            vix_rank = 0.0
+        else:
+            vix_rank = ((float(current['^VIX']) - vix_low) / (vix_high - vix_low)) * 100
 
         # Realized Volatility (20-dniowa SPX)
         spx_returns = data_1y['^GSPC'].tail(21).pct_change().dropna()
-        spx_rv = spx_returns.std() * np.sqrt(252) * 100
+        spx_rv = float(spx_returns.std() * np.sqrt(252) * 100)
 
         return MarketData(
-            vix=current['^VIX'],
-            vix9d=current['^VIX9D'],
-            vix3m=current['^VIX3M'],
-            vix6m=current['^VIX6M'],
-            vvix=current['^VVIX'],
-            skew=current['^SKEW'],
+            vix=float(current['^VIX']),
+            vix9d=float(current['^VIX9D']),
+            vix3m=float(current['^VIX3M']),
+            vix6m=float(current['^VIX6M']),
+            vvix=float(current['^VVIX']),
+            skew=float(current['^SKEW']),
             spx_rv_20d=spx_rv,
             vix_52w_high=vix_high,
             vix_52w_low=vix_low,
@@ -63,50 +67,47 @@ class VommaEngine:
         score = 100
         signals = {}
 
-        # 1. VVIX/VIX Ratio (20 pts)
         ratio = data.vvix / data.vix
         if ratio > 6.0:
             score -= 20
-            signals['vvix_vix'] = {"status": "Red", "msg": f"Ratio {ratio:.2f} > 6.0 (Regime change risk)"}
+            signals['vvix_vix'] = {"status": "Red", "msg": f"Ratio {ratio:.2f} > 6.0 (Regime risk)"}
         else:
             signals['vvix_vix'] = {"status": "Green", "msg": f"Ratio {ratio:.2f} < 6.0 (Safe)"}
 
-        # 2. Slow Crossover (20 pts)
         if data.vix > data.vix3m:
             score -= 20
             signals['slow_cross'] = {"status": "Red", "msg": "VIX > VIX3M (Structural fear)"}
         else:
-            signals['slow_cross'] = {"status": "Green", "msg": "VIX < VIX3M (Normal Contango)"}
+            signals['slow_cross'] = {"status": "Green", "msg": "VIX < VIX3M (Contango)"}
 
-        # 3. Fast Crossover (15 pts)
         if data.vix9d > data.vix:
             score -= 15
-            signals['fast_cross'] = {"status": "Red", "msg": "VIX9D > VIX (Short-term panic)"}
+            signals['fast_cross'] = {"status": "Red", "msg": "VIX9D > VIX (Panic pricing)"}
         else:
             signals['fast_cross'] = {"status": "Green", "msg": "VIX9D < VIX (Calm)"}
 
-        # 4. Toxic Mix (15 pts)
         if data.vix < 16 and data.skew > 130:
             score -= 15
-            signals['toxic_mix'] = {"status": "Red", "msg": f"VIX < 16 AND SKEW > 130 (Tail risk hidden)"}
+            signals['toxic_mix'] = {"status": "Red", "msg": f"VIX < 16 & SKEW > 130 (Tail risk)"}
         else:
             signals['toxic_mix'] = {"status": "Green", "msg": "No Toxic Mix detected"}
 
-        # 5. Ultra-Slow (15 pts)
         if data.vix3m > data.vix6m:
             score -= 15
-            signals['ultra_slow'] = {"status": "Red", "msg": "VIX3M > VIX6M (Long-term backwardation)"}
+            signals['ultra_slow'] = {"status": "Red", "msg": "VIX3M > VIX6M (Backwardation)"}
         else:
             signals['ultra_slow'] = {"status": "Green", "msg": "VIX3M < VIX6M (Normal)"}
 
-        # 6. VVIX Divergence (15 pts)
-        vix_change = (data.history['^VIX'][-1] / data.history['^VIX'][-2]) - 1
-        vvix_change = (data.history['^VVIX'][-1] / data.history['^VVIX'][-2]) - 1
-        if vvix_change > 0.02 and vix_change < 0.01:
-            score -= 15
-            signals['divergence'] = {"status": "Red", "msg": "VVIX rising while VIX calm"}
-        else:
-            signals['divergence'] = {"status": "Green", "msg": "No divergence"}
+        try:
+            vix_change = (data.history['^VIX'][-1] / data.history['^VIX'][-2]) - 1
+            vvix_change = (data.history['^VVIX'][-1] / data.history['^VVIX'][-2]) - 1
+            if vvix_change > 0.02 and vix_change < 0.01:
+                score -= 15
+                signals['divergence'] = {"status": "Red", "msg": "VVIX rising, VIX calm"}
+            else:
+                signals['divergence'] = {"status": "Green", "msg": "No divergence"}
+        except:
+            signals['divergence'] = {"status": "Green", "msg": "No divergence data"}
 
         return score, signals
 
@@ -115,23 +116,21 @@ class VommaEngine:
         vrp = data.vix - data.spx_rv_20d
         if vrp > 5:
             state = "PREMIUM RICH"
-            color = "#10b981" # Green
+            color = "#10b981" 
         elif vrp > 2:
             state = "NORMAL"
-            color = "#3b82f6" # Blue
+            color = "#3b82f6" 
         elif vrp > 0:
             state = "THIN"
-            color = "#f59e0b" # Orange
+            color = "#f59e0b" 
         else:
             state = "NEGATIVE"
-            color = "#ef4444" # Red
+            color = "#ef4444" 
             
         return vrp, state, color
 
     @staticmethod
     def get_curve_points(data: MarketData):
-        # 7 punktowa krzywa: Spot, M1, M2, M3, M4, M5, M6
-        # Prawdziwe: Spot, M3, M6. Reszta to interpolacja liniowa.
         spot = data.vix
         m3 = data.vix3m
         m6 = data.vix6m
