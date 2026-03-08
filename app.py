@@ -310,10 +310,11 @@ with col_badges:
     # VIX Rank badge
     vr = data["vix_rank"]
     vr_tier = data["vix_rank_tier"]
+    vr_str = f"{vr:.0f}%" if vr is not None else "N/A"
     b2.markdown(f"""<div style="text-align:center; background:#161b22; border:1px solid #30363d;
         border-radius:8px; padding:8px;">
         <div style="color:#8b949e; font-size:0.75em;">VIX RANK</div>
-        <div style="color:#e6edf3; font-size:1.5em; font-weight:700;">{vr:.0f}%</div>
+        <div style="color:#e6edf3; font-size:1.5em; font-weight:700;">{vr_str}</div>
         <div style="color:#8b949e; font-size:0.8em;">{vr_tier}</div>
     </div>""", unsafe_allow_html=True)
 
@@ -350,7 +351,7 @@ curve_data = data.get("curve")
 curve_shape_str = curve_data["shape"] if curve_data else "N/A"
 vc1.metric("Vol Curve", curve_shape_str)
 vc2.metric("Edge Score", f"{data['edge_score']} / 100")
-vrp_str = f"+{data['vrp']}" if data['vrp'] and data['vrp'] >= 0 else str(data['vrp'])
+vrp_str = f"+{data['vrp']}" if data['vrp'] is not None and data['vrp'] >= 0 else (f"{data['vrp']}" if data['vrp'] is not None else "N/A")
 vc3.metric("VRP", vrp_str)
 vc4.metric("VIX Rank", f"{data['vix_rank']:.0f}%" if data['vix_rank'] else "N/A")
 
