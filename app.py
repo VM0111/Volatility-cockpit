@@ -94,6 +94,15 @@ st.markdown('<hr style="margin:8px 0 18px;border-color:#dfe1e6">', unsafe_allow_
 # TRADE TODAY
 st.markdown('<div class="sec">Trade Today?</div>', unsafe_allow_html=True)
 
+with st.expander("Verdict logic and thresholds"):
+    st.markdown("""
+- **Favorable** — Normal vol curve (VIX < VIX3M) + Edge >= 70 + VRP > 0. Full size, sell premium.
+- **Caution** — Mixed signals. Reduce size, prefer defined risk.
+- **Defensive** — Toxic Mix active or Edge < 40. No new short-vol, preserve capital.
+
+Active alerts show specific actions from crossover signals and VRP state.
+    """)
+
 if regime == "CONTANGO" and edge_score >= 70 and vrp > 0:
     vt, vd, vb, vc = "FAVORABLE", "Conditions support selling premium", "#e3fcef", "#006644"
     stxt = "Sell 16\u0394 strangles at 45 DTE. Use 35% BP. Theta target: 0.1\u20130.3% NLV/day."
@@ -104,7 +113,7 @@ else:
     vt, vd, vb, vc = "CAUTION", "Mixed signals. Reduce size, be selective.", "#fffae6", "#974f0c"
     stxt = "Smaller size, prefer defined risk (spreads). Take profits at 50%. Manage at 21 DTE."
 
-vi = {"\x46AVORABLE": "\U0001f7e2", "CAUTION": "\U0001f7e1", "DEFENSIVE": "\U0001f534"}.get(vt, "")
+vi = {"FAVORABLE": "\U0001f7e2", "CAUTION": "\U0001f7e1", "DEFENSIVE": "\U0001f534"}.get(vt, "")
 
 ah = ""
 for a in alerts:
@@ -125,6 +134,16 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown('<div class="sec">Volatility Risk Premium (VRP)</div>', unsafe_allow_html=True)
+
+    with st.expander("What is VRP?"):
+        st.markdown("""
+**VRP = VIX - Realized Vol (20d SPX).** The structural edge behind premium selling.
+
+Implied Volatility exceeded Realized Volatility ~83-88% of the time for S&P 500 (1990-2023). This is the insurance premium the market systematically overpays for protection. Premium sellers harvest this structural edge.
+
+**Thresholds:** > 5 pts = premium rich, 2-5 = normal, < 2 = thin (warning), < 0 = negative (structural edge absent).
+        """)
+
     mx = max(data.vix, data.spx_rv_20d, 1)
     vw = data.vix / mx * 100
     rw = data.spx_rv_20d / mx * 100
@@ -132,7 +151,26 @@ with col1:
 
 with col2:
     st.markdown('<div class="sec">The Edge \u2014 Ratios & Crossovers</div>', unsafe_allow_html=True)
+
+    with st.expander("Edge Score methodology"):
+        st.markdown("""
+**5 signals composed into the Edge Score (0-100).**
+
+Each signal is a binary comparison: green = safe to trade, red = warning.
+
+| Signal | Weight | Threshold |
+|--------|--------|-----------|
+| VVIX/VIX Ratio | 25 pts | <5 safe, 5-6 neutral, >6 regime risk |
+| Slow Crossover | 25 pts | VIX < VIX3M = safe |
+| Fast Crossover | 20 pts | VIX9D < VIX = safe |
+| Toxic Mix | 15 pts | VIX < 16 AND SKEW > 130 = danger |
+| VVIX Divergence | 15 pts | VVIX rising while VIX calm = hidden fear |
+
+**Scoring:** >= 70 Favorable, 40-69 Caution, < 40 Defensive.
+        """)
+
     st.markdown(f'<div class="etrack"><div class="efill" style="width:{edge_score}%;background:{ec}">{edge_score}/100</div></div>', unsafe_allow_html=True)
+
     sh = '<div class="card cbody" style="padding:16px 20px">'
     for k, v in signals.items():
         pc = "pg" if v['status'] == 'Green' else "pr"
@@ -143,6 +181,20 @@ with col2:
 
 # VOL COMPLEX
 st.markdown('<div class="sec" style="margin-top:18px">Volatility Complex</div>', unsafe_allow_html=True)
+
+with st.expander("Index descriptions and sparkline logic"):
+    st.markdown("""
+- **VIX** — 30-day implied vol of S&P 500. The main fear gauge.
+- **VVIX** — Volatility of VIX options. Uncertainty about future VIX levels.
+- **VIX9D** — 9-day implied vol. Reacts fastest to sudden events.
+- **VIX3M** — 3-month implied vol. Structural trend indicator.
+- **VIX6M** — 6-month implied vol. Long-term market expectations.
+- **SKEW** — Tail risk asymmetry. High SKEW = market pricing crash risk.
+- **P/C Ratio** — CBOE equity put/call ratio. >1.0 = fear (puts dominate), <0.7 = complacency.
+
+**Sparkline color:** red = vol rising (risk increasing), green = vol falling (favorable).
+    """)
+
 ct = [("^VIX","VIX"),("^VVIX","VVIX"),("^VIX9D","VIX9D"),("^VIX3M","VIX3M"),("^VIX6M","VIX6M"),("^SKEW","SKEW"),("^CPC","P/C Ratio")]
 cols = st.columns(4)
 for i, (tk, nm) in enumerate(ct):
@@ -154,13 +206,29 @@ for i, (tk, nm) in enumerate(ct):
         pc = (ch/pr)*100 if pr != 0 else 0
         cc = "#de350b" if ch > 0 else "#00875a"
         s = "+" if ch >= 0 else ""
-        mn, mx = min(h), max(h)
-        d = mx - mn if mx != mn else 1
+        mn, mxx = min(h), max(h)
+        d = mxx - mn if mxx != mn else 1
         pts = " ".join([f"{j*(100/(len(h)-1)):.1f},{28-((v-mn)/d)*28:.1f}" for j,v in enumerate(h)])
         cols[i%4].markdown(f'<div class="sc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:.82em;font-weight:700;color:#172b4d">{nm}</span><span class="mono" style="font-weight:700;color:#172b4d">{c:.2f}</span></div><svg viewBox="-1 -1 102 30" width="100%" height="24" preserveAspectRatio="none"><polyline points="{pts}" fill="none" stroke="{cc}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><div style="font-size:.75em;font-weight:600;text-align:right;margin-top:4px;color:{cc}">{s}{ch:.2f} ({s}{pc:.1f}%)</div></div>', unsafe_allow_html=True)
 
 # VOL CURVE
 st.markdown('<div class="sec" style="margin-top:18px">Implied Vol Curve (CBOE Indices)</div>', unsafe_allow_html=True)
+
+with st.expander("How to read the vol curve"):
+    st.markdown("""
+This chart plots CBOE implied volatility indices: VIX (30-day) -> VIX3M (3-month) -> VIX6M (6-month) with interpolated midpoints.
+
+**This is NOT the VIX futures term structure.** For actual VIX futures (contango/backwardation of VX contracts), see VIXCentral.com.
+
+- **Upward slope** — Longer-term vol > short-term. Normal state, no immediate panic.
+- **Inverted (VIX > VIX3M)** — Short-term fear exceeds longer-term. This IS the slow crossover signal.
+- **Partial inversion** — VIX9D spike or back-end kink (VIX3M > VIX6M). Watch closely.
+
+**Spreads:** Front (VIX3M - VIX) and Back (VIX6M - VIX3M) measure steepness. Green > +1.5, amber > 0, red < 0.
+
+**Timing note:** VIX updates from 3:00 AM ET (premarket), but VIX3M/VIX6M only update during regular hours (9:30 AM - 4:15 PM ET). Before the open, VIX may spike while longer tenors still show yesterday's close, causing a temporary apparent inversion.
+    """)
+
 points = VommaEngine.get_curve_points(data)
 lb = ['VIX','M1','M2','VIX3M','M4','M5','VIX6M']
 fs = data.vix3m - data.vix
@@ -178,6 +246,16 @@ st.plotly_chart(fig, use_container_width=True)
 
 # PORTFOLIO CALCULATOR
 st.markdown('<div class="sec" style="margin-top:18px">Portfolio Calculator</div>', unsafe_allow_html=True)
+
+with st.expander("Parameter definitions"):
+    st.markdown("""
+- **BP Usage** — Max buying power deployed. Scales with VIX: higher vol = more BP allowed (richer premium compensates risk).
+- **Theta Target** — Daily time decay your portfolio should collect. Minimum always 0.1% NLV; max scales with VIX tier.
+- **SPY BW Delta** — Max directional exposure in SPY beta-weighted terms. Keep near zero (delta neutral). Hard limit: +/-0.15% NLV.
+- **Max Position** — Per-trade BPR cap. Defined risk (spreads, iron condors): 5% NLV. Undefined risk (strangles, naked): 7% NLV.
+- **Capital Reserve** — Undeployed capital. Your oxygen during margin expansion in crashes. Never allocate 100%.
+    """)
+
 nlv = st.number_input("Net Liquidation Value ($)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
 vn = data.vix
 if nlv > 0:
@@ -185,9 +263,9 @@ if nlv > 0:
         if vn < lim:
             break
     res = 1.0 - bp
-    vt = "< 15" if vn<15 else ("15-20" if vn<20 else ("20-30" if vn<30 else ("30-40" if vn<40 else "> 40")))
+    vtier = "< 15" if vn<15 else ("15-20" if vn<20 else ("20-30" if vn<30 else ("30-40" if vn<40 else "> 40")))
     p1,p2,p3 = st.columns(3)
-    p1.metric("VIX Tier", vt)
+    p1.metric("VIX Tier", vtier)
     p2.metric("BP Usage", f"{bp*100:.0f}% (${nlv*bp:,.0f})")
     p3.metric("Capital Reserve", f"{res*100:.0f}% (${nlv*res:,.0f})")
     p4,p5,p6 = st.columns(3)
@@ -199,14 +277,35 @@ else:
 
 # GUIDELINES TABLE
 st.markdown('<div class="sec">Portfolio Guidelines</div>', unsafe_allow_html=True)
+
+with st.expander("How to use this table"):
+    st.markdown("""
+The highlighted row matches the current VIX reading. As VIX rises, you can use more buying power and collect more theta because premium is richer and compensates for the higher risk.
+
+- **BP Usage** — Maximum % of Net Liquidation Value deployed as buying power.
+- **Target Theta** — Daily theta decay target as % of NLV. E.g., 0.2% NLV on a $100k account = $200/day.
+
+These are guidelines, not hard rules. Always consider Edge Score, regime, and individual position risk.
+    """)
+
 rd = [("< 15","25%","0.1% NLV",vn<15),("15 \u2013 20","30%","0.1 \u2013 0.2% NLV",15<=vn<20),("20 \u2013 30","35%","0.1 \u2013 0.3% NLV",20<=vn<30),("30 \u2013 40","40%","0.1 \u2013 0.4% NLV",30<=vn<40),("> 40","50%","0.1 \u2013 0.5% NLV",vn>=40)]
 tr = ""
-for lv,bp,th,act in rd:
-    tr += f'<tr{"  class=\"act\"" if act else ""}><td>{lv}</td><td>{bp}</td><td>{th}</td></tr>'
+for lv,bpp,th,act in rd:
+    tr += f'<tr{" class=act" if act else ""}><td>{lv}</td><td>{bpp}</td><td>{th}</td></tr>'
 st.markdown(f'<div class="card" style="padding:0"><table class="vtbl"><thead><tr><th>VIX Level</th><th>BP Usage</th><th>Target Theta</th></tr></thead><tbody>{tr}</tbody></table></div>', unsafe_allow_html=True)
 
 # POSITION MANAGEMENT
 st.markdown('<div class="sec" style="margin-top:18px">Position Management</div>', unsafe_allow_html=True)
+
+with st.expander("Management philosophy"):
+    st.markdown("""
+Entry is only half the trade — management determines P&L.
+
+- **50% Rule** — Close at 50% of max profit. Taking profits early avoids gamma risk and builds winning consistency.
+- **21 DTE** — Manage (close or roll) at 21 DTE. Closing at half the duration captures ~75% of profit with significantly less risk.
+- **Rolling** — Always roll for a credit ("death before debit"). Rolling the untested side raises win rate from 32% to 65%.
+    """)
+
 m1,m2,m3 = st.columns(3)
 with m1:
     st.markdown('<div class="mgmt"><h4>Profit Taking</h4><div class="ml">Target: <span class="mv">50% of max profit</span></div><div class="ml">Taking profits early avoids gamma risk and builds consistency.</div></div>', unsafe_allow_html=True)
