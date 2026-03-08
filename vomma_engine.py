@@ -14,7 +14,7 @@ class MarketData:
     vix6m: float
     vvix: float
     skew: float
-    cpc: float  # Put/Call Ratio
+    cpc: float
     spx_rv_20d: float
     vix_rank: float
     history: dict  
@@ -22,52 +22,82 @@ class MarketData:
 class VommaEngine:
     @staticmethod
     def fetch_all_data() -> MarketData:
-        # ^CPC to CBOE Put/Call Ratio. VIXEQ jest bardzo trudno dostępne w darmowym YF, 
-        # więc zabezpieczamy się w kodzie.
         tickers = ["^VIX", "^VIX9D", "^VIX3M", "^VIX6M", "^VVIX", "^SKEW", "^GSPC", "^CPC"]
+        hist_data = {}
         
-        data_1y = yf.download(tickers, period="1y", interval="1d", progress=False)['Close']
-        data_1y = data_1y.ffill()
+        # Pobieranie "kuloodporne" - każdy ticker osobno
+        for t in tickers:
+            try:
+                df = yf.Ticker(t).history(period="1y")
+                if not df.empty and 'Close' in df.columns:
+                    hist_data[t] = df['Close']
+            except Exception:
+                pass
+                
+        if not hist_data:
+            raise Exception("API Yahoo Finance nie odpowiada (Brak połączenia).")
+
+        data_1y = pd.DataFrame(hist_data).ffill()
         
+        if '^VIX' not in data_1y.columns:
+            raise Exception("Brak danych bazowych VIX z Yahoo Finance. API może mieć awarię.")
+
         current = data_1y.iloc[-1]
-        hist_5d = data_1y.tail(6).to_dict('series') # 6 dni, by mieć 5 dni zmian
+        hist_5d = data_1y.tail(6).to_dict('series')
         
+        # Bezpieczne wyciąganie danych (Fallback na wypadek braku tickera z Yahoo)
+        def safe_get(key, default):
+            val = current.get(key, default)
+            return float(val) if not pd.isna(val) else default
+
+        vix_val = safe_get('^VIX', 20.0)
+        vix9d_val = safe_get('^VIX9D', vix_val)
+        vix3m_val = safe_get('^VIX3M', vix_val)
+        vix6m_val = safe_get('^VIX6M', vix_val)
+        vvix_val = safe_get('^VVIX', 100.0)
+        skew_val = safe_get('^SKEW', 130.0)
+        cpc_val = safe_get('^CPC', 0.85)
+
         vix_high = float(data_1y['^VIX'].max())
         vix_low = float(data_1y['^VIX'].min())
         
         if vix_high - vix_low == 0:
             vix_rank = 50.0
         else:
-            vix_rank = ((float(current['^VIX']) - vix_low) / (vix_high - vix_low)) * 100
+            vix_rank = ((vix_val - vix_low) / (vix_high - vix_low)) * 100
 
-        spx_returns = data_1y['^GSPC'].tail(21).pct_change().dropna()
-        spx_rv = float(spx_returns.std() * np.sqrt(252) * 100)
-
-        # Pobieranie P/C ratio z zabezpieczeniem (czasami YF gubi te dane)
-        cpc_val = float(current['^CPC']) if '^CPC' in current and not pd.isna(current['^CPC']) else 0.85
+        # Bezpieczne obliczanie Realized Volatility dla S&P 500
+        if '^GSPC' in data_1y.columns:
+            spx_returns = data_1y['^GSPC'].tail(21).pct_change().dropna()
+            spx_rv = float(spx_returns.std() * np.sqrt(252) * 100)
+        else:
+            spx_rv = vix_val  # Fallback
+            
+        safe_history = {}
+        for k, v in hist_5d.items():
+            safe_history[k] = v.dropna().tolist()
 
         return MarketData(
-            vix=float(current['^VIX']),
-            vix9d=float(current['^VIX9D']),
-            vix3m=float(current['^VIX3M']),
-            vix6m=float(current['^VIX6M']),
-            vvix=float(current['^VVIX']),
-            skew=float(current['^SKEW']),
+            vix=vix_val,
+            vix9d=vix9d_val,
+            vix3m=vix3m_val,
+            vix6m=vix6m_val,
+            vvix=vvix_val,
+            skew=skew_val,
             cpc=cpc_val,
             spx_rv_20d=spx_rv,
             vix_rank=vix_rank,
-            history={k: v.dropna().tolist() for k, v in hist_5d.items()}
+            history=safe_history
         )
 
     @staticmethod
     def calculate_edge(data: MarketData):
-        # DOKŁADNE WAGI Z KODU HTML VOMMA (Max 100)
         score = 100
         signals = {}
         active_alerts = []
 
         # 1. VVIX/VIX Ratio (25 pts)
-        ratio = data.vvix / data.vix
+        ratio = data.vvix / data.vix if data.vix > 0 else 0
         if ratio > 6.0:
             score -= 25
             signals['VVIX/VIX Ratio (25 pts)'] = {"status": "Red", "msg": "Vol-of-vol relative to vol. >6 = regime change risk."}
@@ -125,3 +155,14 @@ class VommaEngine:
         else:
             state, color, pct = "NEGATIVE", "#ef4444", 10
         return vrp, state, color, pct
+
+    @staticmethod
+    def get_curve_points(data: MarketData):
+        spot = data.vix
+        m3 = data.vix3m
+        m6 = data.vix6m
+        m1 = spot + (m3 - spot) * (1/3)
+        m2 = spot + (m3 - spot) * (2/3)
+        m4 = m3 + (m6 - m3) * (1/3)
+        m5 = m3 + (m6 - m3) * (2/3)
+        return [spot, m1, m2, m3, m4, m5, m6]
