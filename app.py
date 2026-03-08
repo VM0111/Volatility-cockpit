@@ -19,11 +19,13 @@ st.markdown("""<style>
 [data-testid="stMetricLabel"]{color:var(--muted)!important;font-size:.75em!important;text-transform:uppercase;letter-spacing:.5px}
 [data-testid="stMetricValue"]{color:var(--text)!important;font-family:'JetBrains Mono',monospace!important}
 .streamlit-expanderHeader{font-size:.85em!important;color:var(--text2)!important}
-[data-testid="stExpander"] details summary{padding-left:28px!important;position:relative}
-[data-testid="stExpander"] details summary svg{position:absolute;left:6px;top:50%;transform:translateY(-50%)}
-[data-testid="stExpander"] summary span{overflow:visible!important}
-.st-emotion-cache-p5msec{padding-left:28px!important}
-details summary span p{margin-left:4px!important}
+details summary{gap:12px!important}
+details summary svg{flex-shrink:0!important;min-width:16px!important}
+details summary>span{padding-left:8px!important}
+details summary>span>p{padding-left:0!important;margin-left:0!important}
+[data-testid="stExpander"] summary{gap:12px!important}
+[data-testid="stExpander"] summary>div{gap:12px!important}
+[data-testid="stExpander"] summary span[data-testid="stMarkdownContainer"]{padding-left:8px!important}
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .hdr-left{display:flex;align-items:baseline;gap:12px}
 .hdr-title{font-size:1.4em;font-weight:700;color:var(--text);letter-spacing:-.3px}
@@ -125,7 +127,7 @@ st.markdown('<hr style="margin:8px 0 18px;border-color:#dfe1e6">', unsafe_allow_
 # ==========================================
 st.markdown('<div class="sec">Trade Today?</div>', unsafe_allow_html=True)
 
-with st.expander("  Verdict logic and thresholds", expanded=False):
+with st.expander("    Verdict logic and thresholds", expanded=False):
     st.markdown("""
 - **Favorable** — Normal vol curve (VIX < VIX3M) + Edge >= 70 + VRP > 0. Full size, sell premium.
 - **Caution** — Mixed signals. Reduce size, prefer defined risk.
@@ -183,7 +185,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown('<div class="sec">Volatility Risk Premium (VRP)</div>', unsafe_allow_html=True)
-    with st.expander("  What is VRP?", expanded=False):
+    with st.expander("    What is VRP?", expanded=False):
         st.markdown("**VRP = VIX - Realized Vol (20d SPX).** The structural edge behind premium selling. Implied Vol exceeded Realized Vol ~83-88% of the time for S&P 500 (1990-2023). Thresholds: >5 = rich, 2-5 = normal, <2 = thin, <0 = negative.")
 
     # Proportional bars
@@ -206,7 +208,7 @@ with col1:
 
 with col2:
     st.markdown('<div class="sec">The Edge — Ratios & Crossovers</div>', unsafe_allow_html=True)
-    with st.expander("  Edge Score methodology", expanded=False):
+    with st.expander("    Edge Score methodology", expanded=False):
         st.markdown("5 signals (total 100 pts): VVIX/VIX Ratio (25), Slow Crossover (25), Fast Crossover (20), Toxic Mix (15), VVIX Divergence (15). >=70 Favorable, 40-69 Caution, <40 Defensive.")
 
     st.markdown(f'<div class="edge-track"><div class="edge-fill" style="width:{edge_score}%;background:{edge_color}">{edge_score}/100</div></div>', unsafe_allow_html=True)
@@ -224,7 +226,7 @@ with col2:
 # ==========================================
 st.markdown('<div class="sec" style="margin-top:18px">Volatility Complex</div>', unsafe_allow_html=True)
 
-with st.expander("  Index descriptions and sparkline logic", expanded=False):
+with st.expander("    Index descriptions and sparkline logic", expanded=False):
     st.markdown("""
 - **VIX** — 30-day implied vol. The main fear gauge.
 - **VVIX** — Vol-of-VIX. Uncertainty about future VIX levels.
@@ -265,7 +267,7 @@ for i, (ticker, name) in enumerate(complex_tickers):
 # ==========================================
 st.markdown('<div class="sec" style="margin-top:18px">Implied Vol Curve (CBOE Indices)</div>', unsafe_allow_html=True)
 
-with st.expander("  How to read the vol curve", expanded=False):
+with st.expander("    How to read the vol curve", expanded=False):
     st.markdown("""
 Plots VIX9D -> VIX -> VIX3M -> VIX6M with interpolated midpoints. **NOT** VIX futures term structure.
 
@@ -306,7 +308,7 @@ st.plotly_chart(fig, use_container_width=True)
 # ==========================================
 st.markdown('<div class="sec" style="margin-top:18px">Portfolio Calculator</div>', unsafe_allow_html=True)
 
-with st.expander("  Parameter definitions", expanded=False):
+with st.expander("    Parameter definitions", expanded=False):
     st.markdown("""
 - **BP Usage** — Max buying power deployed. Scales with VIX.
 - **Theta Target** — Daily time decay target. Min 0.1% NLV.
@@ -343,7 +345,7 @@ st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
 # ==========================================
 st.markdown('<div class="sec">Portfolio Guidelines</div>', unsafe_allow_html=True)
 
-with st.expander("  How to use this table", expanded=False):
+with st.expander("    How to use this table", expanded=False):
     st.markdown("Highlighted row matches current VIX. Higher VIX = more BP allowed because premium is richer. These are guidelines, not hard rules.")
 
 rows_data = [
@@ -368,7 +370,7 @@ st.markdown(f"""<div class="card" style="padding:0">
 # ==========================================
 st.markdown('<div class="sec" style="margin-top:18px">Position Management</div>', unsafe_allow_html=True)
 
-with st.expander("  Management philosophy", expanded=False):
+with st.expander("    Management philosophy", expanded=False):
     st.markdown("Entry is half the trade. 50% profit target avoids gamma risk. 21 DTE management captures ~75% of profit. Rolling for credit raises win rate from 32% to 65%.")
 
 mc1, mc2, mc3 = st.columns(3)
