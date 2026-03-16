@@ -138,7 +138,7 @@ class VommaEngine:
                 signals['VVIX Divergence (15 pts)'] = {"status": "Red", "msg": "VVIX rising while VIX stays calm."}
             else:
                 signals['VVIX Divergence (15 pts)'] = {"status": "Green", "msg": "No divergence."}
-        except:
+        except Exception:
             signals['VVIX Divergence (15 pts)'] = {"status": "Green", "msg": "No divergence data."}
 
         return score, signals, active_alerts
