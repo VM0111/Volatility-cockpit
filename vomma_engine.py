@@ -44,12 +44,6 @@ class VommaEngine:
 
         current = data_1y.iloc[-1]
 
-        # Build history from original (non-ffilled) data to preserve real changes
-        hist_5d = {}
-        for t_key, t_series in hist_data.items():
-            clean = t_series.dropna().tail(6)
-            hist_5d[t_key] = clean
-        
         # Bezpieczne wyciąganie danych (Fallback na wypadek braku tickera z Yahoo)
         def safe_get(key, default):
             val = current.get(key, default)
@@ -78,9 +72,13 @@ class VommaEngine:
         else:
             spx_rv = vix_val  # Fallback
             
+        # Build history from original per-ticker data (not ffilled DataFrame)
+        # to avoid duplicate values from forward-fill on missing dates
         safe_history = {}
-        for k, v in hist_5d.items():
-            safe_history[k] = v.dropna().tolist()
+        for t_key, t_series in hist_data.items():
+            clean = t_series.dropna()
+            clean = clean[~clean.index.duplicated(keep='last')]
+            safe_history[t_key] = clean.tail(6).tolist()
 
         return MarketData(
             vix=vix_val,

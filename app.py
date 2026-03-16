@@ -203,6 +203,11 @@ for i, (tk, nm) in enumerate(ct):
         h = data.history[tk]
         c = h[-1]
         pr = h[-2]
+        if c == pr and len(h) > 2:
+            for back in range(len(h)-3, -1, -1):
+                if h[back] != c:
+                    pr = h[back]
+                    break
         ch = c - pr
         pc = (ch/pr)*100 if pr != 0 else 0
         cc = "#de350b" if ch > 0 else "#00875a"
