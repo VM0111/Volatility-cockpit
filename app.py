@@ -8,7 +8,8 @@ st.set_page_config(page_title="Alpha Volatility Cockpit", layout="wide", page_ic
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 :root{--bg:#f4f5f7;--card:#fff;--border:#dfe1e6;--blt:#ebecf0;--tx:#172b4d;--tx2:#6b778c;--mt:#97a0af;--ac:#0052cc;--gn:#00875a;--gnb:#e3fcef;--gbd:#abf5d1;--rd:#de350b;--rdb:#ffebe6;--rbd:#ffbdad;--am:#ff991f;--amb:#fffae6;--abd:#ffe380}
-*{font-family:'DM Sans',system-ui,sans-serif!important}
+*{font-family:'DM Sans',system-ui,sans-serif}
+[data-testid="stMarkdownContainer"],[data-testid="stMarkdownContainer"] *{font-family:'DM Sans',system-ui,sans-serif!important}
 .stApp{background:var(--bg)!important}
 #MainMenu,footer,header{visibility:hidden}
 .block-container{padding-top:1.2rem;max-width:95%;padding-left:2rem;padding-right:2rem}
