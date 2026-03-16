@@ -43,7 +43,12 @@ class VommaEngine:
             raise Exception("Brak danych bazowych VIX z Yahoo Finance. API może mieć awarię.")
 
         current = data_1y.iloc[-1]
-        hist_5d = data_1y.tail(6).to_dict('series')
+
+        # Build history from original (non-ffilled) data to preserve real changes
+        hist_5d = {}
+        for t_key, t_series in hist_data.items():
+            clean = t_series.dropna().tail(6)
+            hist_5d[t_key] = clean
         
         # Bezpieczne wyciąganie danych (Fallback na wypadek braku tickera z Yahoo)
         def safe_get(key, default):
